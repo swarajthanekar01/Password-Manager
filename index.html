@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecurePass Manager</title>
+    <style>
+        :root { --primary: #2563eb; --danger: #dc2626; --bg: #f3f4f6; --gray: #6b7280; }
+        body { font-family: sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 40px; }
+        .card { background: white; width: 100%; max-width: 800px; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        
+        h2 { margin-top: 0; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; }
+        
+        button { background: var(--primary); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; }
+        button:hover { opacity: 0.9; }
+        
+        /* Dashboard Styles */
+        .add-form { background: #eff6ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bfdbfe; }
+        .search-box { margin-bottom: 15px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; background: #f9fafb; padding: 12px; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 12px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+        
+        .btn-del { background: var(--danger); padding: 6px 12px; text-decoration: none; color: white; border-radius: 4px; font-size: 0.9rem; }
+        .btn-copy { background: var(--gray); padding: 4px 8px; margin-left: 8px; border-radius: 4px; font-size: 0.8rem; width: auto; }
+
+        .nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .logout { color: var(--danger); text-decoration: none; font-weight: bold; }
+        
+        .hidden-pass { font-family: monospace; letter-spacing: 2px; }
+        .reveal-btn { cursor: pointer; font-size: 0.8em; color: var(--primary); text-decoration: underline; margin-left: 10px; }
+    </style>
+    <script>
+        function filterTable() {
+            let input = document.getElementById("searchInput");
+            let filter = input.value.toUpperCase();
+            let table = document.getElementById("passTable");
+            let tr = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < tr.length; i++) {
+                let tdSite = tr[i].getElementsByTagName("td")[0];
+                let tdUser = tr[i].getElementsByTagName("td")[1];
+                if (tdSite || tdUser) {
+                    let txtValue = (tdSite.textContent + tdUser.textContent).toUpperCase();
+                    tr[i].style.display = txtValue.indexOf(filter) > -1 ? "" : "none";
+                }
+            }
+        }
+
+        function togglePassword(id) {
+            let passSpan = document.getElementById('pass-' + id);
+            let rawPass = passSpan.getAttribute('data-pass');
+            if (passSpan.textContent.includes('••••')) {
+                passSpan.textContent = rawPass;
+            } else {
+                passSpan.textContent = '••••••••';
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                // Optional: You could show a small 'Copied!' toast notification here
+                alert('Password copied to clipboard!'); 
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+    </script>
+</head>
+<body>
+
+<div class="card">
+    {% if page == 'login' %}
+        <div style="max-width: 400px; margin: 0 auto; text-align: center;">
+            <h2>🔐 Local Vault Login</h2>
+            <p>Enter Master Password to decrypt your database.</p>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}<p style="color:red">{{ messages[0] }}</p>{% endif %}
+            {% endwith %}
+            <form method="POST">
+                <input type="password" name="master_password" placeholder="Master Password" required autofocus>
+                <button type="submit">Unlock Vault</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if page == 'dashboard' %}
+        <div class="nav">
+            <h2>My Credentials</h2>
+            <a href="/logout" class="logout">🔒 Lock Vault</a>
+        </div>
+
+        <div class="add-form">
+            <strong>Add New Password</strong>
+            <form method="POST" action="/add" style="display: flex; gap: 10px; margin-top: 10px;">
+                <input type="text" name="site" placeholder="Site (e.g. Netflix)" required>
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" style="width: auto;">Save</button>
+            </form>
+        </div>
+
+        <input type="text" id="searchInput" onkeyup="filterTable()" class="search-box" placeholder="🔍 Search by site name or username...">
+
+        <table id="passTable">
+            <thead>
+                <tr>
+                    <th>Site</th>
+                    <th>Username</th>
+                    <th>Password</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in entries %}
+                <tr>
+                    <td><b>{{ entry.site }}</b></td>
+                    <td>{{ entry.username }}</td>
+                    <td>
+                        <span id="pass-{{ entry.id }}" class="hidden-pass" data-pass="{{ entry.password }}">••••••••</span>
+                        <span class="reveal-btn" onclick="togglePassword({{ entry.id }})">Show</span>
+                        <button class="btn-copy" onclick="copyToClipboard('{{ entry.password }}')">Copy</button>
+                    </td>
+                    <td><a href="/delete/{{ entry.id }}" class="btn-del">Delete</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+
+</body>
+</html>
